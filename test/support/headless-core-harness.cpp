@@ -7,7 +7,6 @@
 #include <iostream>
 #include <optional>
 #include <stdexcept>
-#include <chrono>
 #include <array>
 #include <vector>
 
@@ -29,7 +28,6 @@
 #include <wayland-server-core.h>
 
 #include "../../src/core/core-impl.hpp"
-#include "../../src/main.hpp"
 
 namespace
 {
@@ -62,7 +60,7 @@ class test_config_backend_t : public wf::config_backend_t
             "auto_reload_config = false\n"
             "enable_input_method_v2 = false\n"
             "use_external_output_configuration = false\n",
-            "xdg-shell-test-config");
+            "default-test-config");
 
         if (!extra_config.empty())
         {
@@ -155,7 +153,7 @@ struct wf::test::headless_core_harness_t::impl
             std::vector<uint32_t> pixels(size.width * size.height);
             wlr_texture_read_pixels_options opts{};
             opts.data   = pixels.data();
-            opts.format = DRM_FORMAT_ABGR8888;
+            opts.format = DRM_FORMAT_RGBA8888;
             opts.stride = size.width * 4;
             if (!wlr_texture_read_pixels(tex, &opts))
             {
@@ -218,6 +216,9 @@ wf::test::headless_core_harness_t::headless_core_harness_t(std::string extra_con
     }
 
     core.ev_loop = wl_display_get_event_loop(core.display);
+    core.wayland_display = add_test_socket(core.display);
+    setenv("WAYLAND_DISPLAY", core.wayland_display.c_str(), 1);
+
     core.backend = wlr_headless_backend_create(core.ev_loop);
     if (!core.backend)
     {
@@ -239,9 +240,6 @@ wf::test::headless_core_harness_t::headless_core_harness_t(std::string extra_con
     core.config_backend = std::make_unique<test_config_backend_t>(std::move(extra_config));
     core.config_backend->init(core.display, *core.config, "");
     core.init();
-
-    core.wayland_display = add_test_socket(core.display);
-    setenv("WAYLAND_DISPLAY", core.wayland_display.c_str(), 1);
 
     if (!wlr_backend_start(core.backend))
     {
